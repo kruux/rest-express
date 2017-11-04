@@ -1,0 +1,23 @@
+{
+  "name": "rest-express",
+  "version": "0.0.1",
+  "description": "",
+  "main": "rest-express.js",
+  "scripts": {
+    "test": "node rest-express.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kruux/rest-express.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kruux/rest-express/issues"
+  },
+  "homepage": "https://github.com/kruux/rest-express#readme",
+  "dependencies": {
+    "axios": "^0.17.0",
+    "express": "^4.16.2"
+  }
+}
