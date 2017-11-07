@@ -11,6 +11,9 @@ const app = express()
 /* Download latest launches object */
 var launches
 var newLaunches
+var x = 'Anka'
+
+
 axios.get('https://launchlibrary.net/1.2/launch/next/20').then(res => {
 	launches = res.data.launches
 
@@ -26,6 +29,18 @@ axios.get('https://launchlibrary.net/1.2/launch/next/20').then(res => {
 		return newLaunch
 	})
 })
+
+/* setInterval runs function every 3000 ms */
+setInterval(() => {
+	if(x == 'Anka'){
+		x = 'Kalle'
+	}
+	else {
+		x = 'Anka'
+	}
+	console.log(x)
+},	3000)
+
 
 /* Enable cors headers */
 app.use(cors())
