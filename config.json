@@ -1,0 +1,5 @@
+{
+	"port": 3555,
+	"SSLKeyPath": "/path/to/key",
+	"SSLCertPath": "/path/to/cert"
+}
