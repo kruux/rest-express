@@ -23,8 +23,8 @@ async function main(){
 	}
 
 	/* setInterval runs every 30 min */
-	setInterval(() => {
-		let result = getLaunches()
+	setInterval(async () => {
+		let result = await getLaunches()
 		/* If not null, update the launches array which the json api returns */
 		if(result){
 			launches = result
