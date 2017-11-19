@@ -17,9 +17,11 @@
   },
   "homepage": "https://github.com/kruux/rest-express#readme",
   "dependencies": {
+    "async": "^2.6.0",
     "axios": "^0.17.0",
     "cors": "^2.8.4",
     "express": "^4.16.2",
-    "fs": "0.0.1-security"
+    "fs": "0.0.1-security",
+    "promise": "^8.0.1"
   }
 }
