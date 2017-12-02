@@ -44,7 +44,7 @@ async function main(){
 	})
 
 	/* Listen for GET on /rest/launches, return the new json array */
-	app.get('/rest/launches', (req, res) => {
+	app.get('/launches', (req, res) => {
 		res.json(launches)
 	})
 
