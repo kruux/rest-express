@@ -1,7 +1,5 @@
 {
-	"port": 3555,
-	"SSLKeyPath": "/path/to/key",
-	"SSLCertPath": "/path/to/cert",
+	"port": 3556,
 	"baseURL": "https://www.rymdklubben.com",
 	"imageURL": "/images/",
 	"imageFolderPath": "./images/"

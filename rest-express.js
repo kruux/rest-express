@@ -2,8 +2,8 @@ const express = require('express')
 var cors = require('cors')
 var fs = require('fs')
 const axios = require('axios')
+var http = require('http')
 var https = require('https')
-var each = require('async/each')
 var Promise = require('promise')
 
 var cfg
@@ -15,13 +15,13 @@ async function main(){
 
 	// Check that config exists
 	if (!cfg) {
-		console.log('Failed to open ' + cfgPath)
+		console.error('Failed to open ' + cfgPath)
 		process.exit(1)
 	}
 
 	var launches = await launchesModule.init()
 	if(!launches){
-		console.log('Failed to get launches array')
+		console.error('Failed to get launches array')
 		process.exit(1)
 	}
 
@@ -32,7 +32,7 @@ async function main(){
 		if(result){
 			launches = result
 		}
-	}, 20000)
+	}, 1800000)
 
 	/* Enable cors headers */
 	app.use(cors())
@@ -49,50 +49,42 @@ async function main(){
 	})
 
 	app.listen(cfg.port, () => {
-		console.log('Server listening on port ' + cfg.port)
+		console.error('Server listening on port ' + cfg.port)
 	})
 }
 
 var launchesModule = {
 	init: async () => {
-		console.log(1)
 		let launches = await launchesModule.get.allData()
 		if(!launches){
 			return null
 		}
 
-		console.log(2)
 		/* Get the name and url of all images */
 		let images = launchesModule.get.imageData(launches)
 
-		console.log(3)
 		/* Filter the list of images to only include new images */
 		let newImages = await launchesModule.get.onlyNewImages(images);
 
-		console.log(4)
 		/* Download the images and save them to disk, if the image doesn't already exist */
 		if( !(await launchesModule.helpers.saveToFile(newImages))){
 			process.exit(1)
 		}
 
-		console.log(5)
 		/* Extract wanted data only */
 		let newLaunches = launchesModule.helpers.filter(launches, images)
 
-		console.log(6)
 		return newLaunches
 	},
 	get: {
 		/* Download latest launches array */
 		allData: async () => {
-			console.log('Fetching new launches array')
 			let launches
 			try{
 				launches = (await axios.get('https://launchlibrary.net/1.2/launch/next/20')).data.launches
-
 			}
 			catch(err){
-				console.log('launches.get.all failed, error: ' + err)
+				console.error('launches.get.all failed, error: ' + err)
 				launches = null
 			}
 			return launches
@@ -109,8 +101,27 @@ var launchesModule = {
 			})
 			return images
 		},
+		/* Check which images already exists and return a list of those who doesn't */
 		onlyNewImages: async (images) => {
-			promises = images.map((image) => {
+
+			/* Save all images to a new list, without any duplicates */
+			let uniqueImages = []
+			for(let i = 0; i < images.length; i++){
+				let image = images[i]
+				let addImage = true
+				for(let j = 0; j < uniqueImages.length; j++){
+					if(image.name === uniqueImages[j].name){
+						addImage = false
+						break;
+					}
+				}
+				if(addImage){
+					uniqueImages.push(image)
+				}
+			}
+
+			/* Check which, of the unique imagenames, exist inside the imagefolder */
+			promises = uniqueImages.map((image) => {
 				return new Promise((resolve, reject) => {
 					fs.access(cfg.imageFolderPath + image.name, (err) => {
 						if(!err){
@@ -122,37 +133,21 @@ var launchesModule = {
 					})
 				})
 			})
-			let newImages = await Promise.all(promises)
+			let uniqueNewImages = await Promise.all(promises)
 
-			let uniqueNewImages = []
-
-			for(let i = 0; i < newImages.length; i++){
-				let image = newImages[i]
-				if(image){
-					let addImage = true
-					for(let j = 0; j < uniqueNewImages.length; j++){
-						if(image.name === uniqueNewImages[j].name){
-							addImage = false
-						}
-					}
-					if(addImage){
-						uniqueNewImages.push(image)
-					}
-				}
-			}
+			/* Filter out all the false resolves created in the Promise.all function */
+			uniqueNewImages = uniqueNewImages.filter((image) => {return image})
 
 			return uniqueNewImages
-
-
 		}
 	},
 	helpers: {
 		filter: (launches, images) => {
 			/* Copy wanted data only to a new object array. */
-			var newLaunches = launches.map((launch, index) => {
+			var newLaunches = launches.map((launch, i) => {
 				var newLaunch = Object.assign({},
 					{id: launch.id},
-					{rocket: {imageURL: cfg.baseURL + cfg.imageURL + images[index].name}},
+					{rocket: {imageURL: cfg.baseURL + cfg.imageURL + images[i].name}},
 					{vidURLs: launch.vidURLs},
 					{name: launch.name},
 					{windowstart: launch.windowstart}
@@ -167,26 +162,45 @@ var launchesModule = {
 			if(images.length === 0){
 				return success
 			}
-			await each(images, (image) => { // await here?
-				var file = fs.createWriteStream(cfg.imageFolderPath + image.name)
-				file.on("error", (err) => {
-					console.log("createWriteStream error: " + err)
-					success = false
+			/* Create a file for every image which doesn't already exist and download it from the original URL */
+			let promises = images.map((image) => {
+				return new Promise((resolve, reject) => {
+					var file = fs.createWriteStream(cfg.imageFolderPath + image.name)
+					file.on("error", (err) => {
+						file.end()
+						file.unlink()
+						reject("createWriteStream error: " + err)
+					})
+
+					/* Determine whether the image is hosted via https or http */
+					let req = image.url.substring(0,5) == 'https' ? https : http
+
+					/* Request image stream */
+					var request = req.get(image.url, (response) => {
+						let { statusCode } = response // destructuring assignment
+						if (statusCode !== 200) {
+							file.end()
+							file.unlink()
+							reject("http(s).get error for " + image.name)
+						}
+						/* Save image stream to file */
+						response.pipe(file)
+						response.on('end', () => {
+							file.end()
+							resolve(true)
+						})
+					})
 				})
-				console.log('Downloading ' + image.name)
-				var request = https.get(image.url, (response) => {
-					let { statusCode } = response // destructuring assignment
-					if (statusCode !== 200) {
-						console.log("https.get error")
-						success = false
-					}
-					response.pipe(file)
-				})
-			}, (err) => {
-				console.log("Error saving image: " + err)
-				success = false
 			})
-			return success
+
+			try{
+				await Promise.all(promises)
+			}
+			catch(err){
+				console.error(err)
+				return false
+			}
+			return true
 		},
 	}
 }
